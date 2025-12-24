@@ -1,0 +1,181 @@
+@import "tailwindcss";
+/* F:\Mehnat\frontend\src\index.css - FINAL LAYOUT & AESTHETIC FIXES */
+
+/* --- ABSOLUTE CSS RESET: TARGETING HTML/BODY MARGINS (White Space Fix) --- */
+html, body {
+    margin: 0 !important; /* Guarantees margin is zero */
+    padding: 0 !important; /* Guarantees padding is zero */
+    height: 100%;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* CRITICAL FIX 1: Ensure HTML and BODY span the entire viewport */
+html {
+  height: 100%;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #f0f0f0; /* Default text color set to light */
+  line-height: 1.6;
+ 
+  /* CRITICAL FIX 2: Set min-height for full viewport coverage */
+  min-height: 100vh;
+  height: 100%;
+ 
+  /* FINAL FIX: Set a solid, non-transparent background color (Default to dark grey) */
+  background-color: #1a1a1a; 
+}
+
+/* --- Root Background Wrapper Styling (Used by App.jsx) --- */
+/*  */
+
+/* --- HOME PAGE BACKGROUND OVERRIDE (CRITICAL: Sets the Green Theme) --- */
+/* This is a dedicated class applied ONLY on the Home page wrapper */
+.home-page-wrapper {
+    background-color: #2e8b57; /* Dark Green matching PMFBY site */
+    flex-grow: 1;
+    width: 100%;
+}
+
+
+/* Header and Navigation Styling (Deep Brown/Gold Header) */
+header {
+  padding: 15px 30px;
+  background-color: #55483a;
+  border-bottom: 5px solid #d4a948;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.7);
+  z-index: 100;
+}
+
+/* Logo Styling (Interactive Fix) */
+.logo h1 {
+  margin-bottom: 0;
+  color: #fff;
+  font-size: 2em;
+  letter-spacing: 1px;
+  transition: color 0.3s ease;
+}
+.logo h1:hover {
+    color: #d4a948;
+    cursor: pointer;
+}
+
+
+/* Navigation Links (Interactive Fix) */
+nav a {
+  color: #f0e6d6;
+  text-decoration: none;
+  margin-left: 25px;
+  font-weight: 600;
+  font-size: 1.05em;
+  transition: color 0.2s ease-in-out;
+}
+
+nav a:hover {
+  color: #d4a948;
+  text-decoration: none;
+}
+
+/* Main Content Area (White Space Fix) */
+main {
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* FIX: Starts content at the top */
+  flex-grow: 1;
+  width: 100%; 
+}
+
+/* --- Form Container Styling (Transparent Effect) --- */
+.register-container,
+.login-container {
+  max-width: 420px;
+  margin: 40px auto;
+  padding: 40px;
+  background-color: rgba(30, 30, 30, 0.95);
+  border-radius: 12px;
+  border: 1px solid rgba(212, 169, 72, 0.3);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+  color: #e0e0e0;
+}
+
+.register-container h2,
+.login-container h2 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #d4a948;
+  font-weight: 300;
+}
+
+/* Home Page Specific Text - Must be light for dark background */
+.home-content h1,
+.home-content p {
+  color: #f0f0f0; 
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+
+
+/* Input Fields and Select Dropdowns (Keep input text light for contrast) */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+select,
+textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #444;
+  border-radius: 8px;
+  background-color: #202020;
+  color: #e0e0e0;
+  transition: border-color 0.2s ease-in-out;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #d4a948;
+  box-shadow: 0 0 8px rgba(212, 169, 72, 0.5);
+}
+
+/* Button Styling (General) */
+button[type="submit"] {
+  width: 100%;
+  padding: 14px;
+  background-color: #d4a948;
+  color: #101010;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.1em;
+  font-weight: bold;
+  transition: background-color 0.3s ease-in-out, transform 0.1s;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+button[type="submit"]:hover {
+  background-color: #c09a40;
+  transform: translateY(-1px);
+}
+
+/* Footer Styling */
+footer {
+  text-align: center;
+  padding: 10px 0;
+  background-color: rgba(30, 30, 30, 0.9);
+  font-size: 0.8em;
+  color: #999;
+  width: 100%;
+  z-index: 10;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.5);
+}
