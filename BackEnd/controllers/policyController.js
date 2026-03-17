@@ -1,91 +1,32 @@
-// // F:\Mehnat\BackEnd\controllers\policyController.js
-
-// import asyncHandler from 'express-async-handler';
-// import Policy from '../models/PolicyModel.js'; 
-
-// // @desc    Create a new insurance policy
-// // @route   POST /api/policies/create
-// // @access  Private (Proposer or Admin role)
-// const createPolicy = asyncHandler(async (req, res) => {
-//     // 1. Role Check
-//     if (req.user.role !== 'Proposer' && req.user.role !== 'Admin') {
-//         res.status(403);
-//         throw new Error('Only Proposers and Admins can create policies.');
-//     }
-
-//     const { name, description, coverageType, premiumPrice, coverageAmount } = req.body;
-
-//     // 2. Simple Validation
-//     if (!name || !premiumPrice || !coverageAmount) {
-//         res.status(400);
-//         throw new Error('Please provide name, premium, and coverage amount.');
-//     }
-
-//     // 3. Create Policy in Database
-//     const policy = await Policy.create({
-//         name,
-//         description,
-//         coverageType,
-//         premiumPrice,
-//         coverageAmount,
-//         proposer: req.user._id, // Assign the policy to the currently logged-in Proposer
-//     });
-
-//     res.status(201).json({
-//         message: 'Policy created successfully.',
-//         policy,
-//     });
-// });
-
-// // --- NEW FUNCTION: Get all active policies for the Farmer's view ---
-// // @desc    Get all active policy plans
-// // @route   GET /api/policies/active
-// // @access  Private (or logged-in user)
-// const getAllPolicies = asyncHandler(async (req, res) => {
-//     // Fetch all policies that are marked as active
-//     const policies = await Policy.find({ isActive: true })
-//         .select('-__v -updatedAt') // Exclude unnecessary fields
-//         .populate('proposer', 'name email'); // Show which Proposer created it
-
-//     res.json(policies);
-// });
-
-// // --- EXPORT BOTH FUNCTIONS ---
-// export { createPolicy, getAllPolicies };
-
-
-// F:\Mehnat\BackEnd\controllers\policyController.js
+// BackEnd/controllers/policyController.js
 
 import asyncHandler from 'express-async-handler';
-import Policy from '../models/PolicyModel.js'; 
+import Policy from '../models/PolicyModel.js';
 
 // @desc    Create a new insurance policy
 // @route   POST /api/policies/create
-// @access  Private (Proposer or Admin role)
+// @access  Private (Proposer or Admin)
 const createPolicy = asyncHandler(async (req, res) => {
-    // 1. Role Check
     if (req.user.role !== 'Proposer' && req.user.role !== 'Admin') {
         res.status(403);
         throw new Error('Only Proposers and Admins can create policies.');
     }
 
-    const { name, description, coverageType, premiumPrice, coverageAmount, companyName } = req.body; // <-- ADD companyName
+    const { name, description, coverageType, premiumPrice, coverageAmount, companyName } = req.body;
 
-    // 2. Simple Validation
-    if (!name || !premiumPrice || !coverageAmount || !companyName) { // <-- ADD companyName validation
+    if (!name || !premiumPrice || !coverageAmount || !companyName) {
         res.status(400);
         throw new Error('Please provide name, premium, coverage amount, and company name.');
     }
 
-    // 3. Create Policy in Database
     const policy = await Policy.create({
         name,
         description,
         coverageType,
         premiumPrice,
         coverageAmount,
-        companyName, // <-- ADDED HERE
-        proposer: req.user._id, // Assign the policy to the currently logged-in Proposer
+        companyName,
+        proposer: req.user._id, // ← always tied to the logged-in proposer
     });
 
     res.status(201).json({
@@ -94,19 +35,40 @@ const createPolicy = asyncHandler(async (req, res) => {
     });
 });
 
-// --- NEW FUNCTION: Get all active policies for the Farmer's view ---
-// @desc    Get all active policy plans
+
+// @desc    Get ALL active policies — for FARMERS to browse
 // @route   GET /api/policies/active
-// @access  Private (or logged-in user)
+// @access  Private (any logged-in user)
 const getAllPolicies = asyncHandler(async (req, res) => {
-    // Fetch all policies that are marked as active
+    // Farmers see ALL active policies from ALL providers
     const policies = await Policy.find({ isActive: true })
-        .select('-__v -updatedAt') // Exclude unnecessary fields
-        // CRITICAL: We need companyName here, which is already in the Policy model
-        .populate('proposer', 'name email'); // Show which Proposer created it
+        .select('-__v -updatedAt')
+        .populate('proposer', 'name email companyName')
+        .sort({ createdAt: -1 });
 
     res.json(policies);
 });
 
-// --- EXPORT BOTH FUNCTIONS ---
-export { createPolicy, getAllPolicies };
+
+// @desc    Get only THIS proposer's own policies — for the Proposer dashboard
+// @route   GET /api/policies/mine
+// @access  Private (Proposer or Admin only)
+const getMyPolicies = asyncHandler(async (req, res) => {
+    if (req.user.role !== 'Proposer' && req.user.role !== 'Admin') {
+        res.status(403);
+        throw new Error('Not authorized.');
+    }
+
+    // Only fetch policies where proposer = currently logged-in user
+    const policies = await Policy.find({
+        proposer: req.user._id,
+        isActive: true,
+    })
+        .select('-__v -updatedAt')
+        .sort({ createdAt: -1 });
+
+    res.json(policies);
+});
+
+
+export { createPolicy, getAllPolicies, getMyPolicies };

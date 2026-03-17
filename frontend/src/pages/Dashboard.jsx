@@ -1,90 +1,48 @@
+// Dashboard.jsx
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../context/AuthContext.jsx'; 
-import FarmerDashboard from './FarmerDashboard.jsx'; 
-import ProposerDashboard from './ProposerDashboard.jsx'; 
+import { useAuth } from '../context/AuthContext.jsx';
+import FarmerDashboard from './FarmerDashboard.jsx';
+import ProposerDashboard from './ProposerDashboard.jsx';
 import axios from 'axios';
 
 function Dashboard() {
-  const { user, token } = useAuth(); 
-  
-  const [protectedData, setProtectedData] = useState(null);
-  const [loading, setLoading] = useState(true); // <-- Controls main render state
-  const [error, setError] = useState(null);
+  const { token, user, setUser } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState(null);
 
   useEffect(() => {
-    // Only fetch if we have a valid token
-    if (token) {
-      const fetchProtectedData = async () => {
-        try {
-          const response = await axios.get('http://localhost:5000/api/auth/profile', {
-            headers: {
-              'Authorization': `Bearer ${token}` 
-            }
-          });
-          
-          setProtectedData(response.data);
-          setError(null);
-        } catch (err) {
-          setError(err.response ? err.response.data.message : 'Failed to fetch protected data.');
-        } finally {
-          setLoading(false); // Set to false once fetch is complete (success or fail)
-        }
-      };
-      
-      fetchProtectedData();
-    } else {
+    if (!token) { setLoading(false); return; }
+    const fetchProfile = async () => {
+      try {
+        const res = await axios.get('http://localhost:5000/api/auth/profile', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const fetchedRole = res.data?.user?.role;
+        setRole(fetchedRole);
+        if (res.data?.user) setUser(prev => ({ ...prev, ...res.data.user }));
+      } catch {
+        setRole(null);
+      } finally {
         setLoading(false);
-    }
-    
-  }, [token]); 
+      }
+    };
+    fetchProfile();
+  }, [token]);
 
+  if (loading) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', gap: '1rem' }}>
+      <div className="loading-spinner" />
+      <p style={{ color: 'var(--earth-400)', fontSize: '0.875rem' }}>Loading your dashboard...</p>
+    </div>
+  );
 
-  // --- ROLE SWITCHING LOGIC ---
-  const renderRoleDashboard = () => {
-    // Check for role based on the fetched data structure
-    const role = protectedData?.user?.role; 
-    
-    switch (role) {
-      case 'Farmer':
-        return <FarmerDashboard />;
-      case 'Proposer':
-        return <ProposerDashboard />;
-      case 'Admin':
-        return <h2>⚙️ Admin Dashboard - Full Access</h2>;
-      default:
-        return <h2>❌ Unknown Role or No User Data Found</h2>;
-    }
-  };
-
+  const resolvedRole = role || user?.role;
+  if (resolvedRole === 'Farmer') return <FarmerDashboard />;
+  if (resolvedRole === 'Proposer' || resolvedRole === 'Admin') return <ProposerDashboard />;
   return (
-    <div style={{ padding: '20px', backgroundColor: 'rgba(0, 0, 0, 0.5)', borderRadius: '8px' }}>
-      
-      <h1>Welcome to the Dashboard, {user?.name || 'User'}!</h1>
-      <p style={{marginBottom: '20px', color: '#ccc'}}>Your current role is: **{protectedData?.user?.role || 'Fetching...'}**</p>
-      
-      <hr style={{ margin: '20px 0' }}/>
-      
-      {/* 1. Show Loading State */}
-      {loading && <p>Loading user profile details...</p>}
-
-      {/* 2. Show Error State */}
-      {!loading && error && <p style={{ color: 'red' }}>Error: {error}</p>}
-      
-      {/* 3. Show Dashboard Content (Role Switch) */}
-      {!loading && protectedData && (
-        <>
-          {/* Render the role-specific component */}
-          {renderRoleDashboard()}
-          
-          <hr style={{ margin: '20px 0' }}/>
-          
-          <h3>Protected Data Status:</h3>
-          <p style={{ color: 'green' }}>Successfully received protected data from backend!</p>
-          <pre style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)', padding: '10px' }}>
-            {JSON.stringify(protectedData, null, 2)}
-          </pre>
-        </>
-      )}
+    <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--earth-400)' }}>
+      <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
+      <p>Unable to load dashboard. Please log out and sign in again.</p>
     </div>
   );
 }

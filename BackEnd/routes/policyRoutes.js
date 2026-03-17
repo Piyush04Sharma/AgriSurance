@@ -1,18 +1,18 @@
-// F:\Mehnat\BackEnd\routes\policyRoutes.js
+// BackEnd/routes/policyRoutes.js
 
 import express from 'express';
-import { protect } from '../middleware/authMiddleware.js'; 
-import { createPolicy, getAllPolicies } from '../controllers/policyController.js'; // <-- CRITICAL: IMPORT NEW FUNCTION
+import { protect } from '../middleware/authMiddleware.js';
+import { createPolicy, getAllPolicies, getMyPolicies } from '../controllers/policyController.js';
 
 const router = express.Router();
 
-// POST /create (Proposer creates a policy)
-router.post('/create', protect, createPolicy);
-
-// --- NEW ROUTE: Get Active Policies ---
-// GET /active (Farmer will call this)
-// This route is protected, requiring a valid JWT from any logged-in user.
+// GET /api/policies/active  — ALL active policies (for Farmer marketplace)
 router.get('/active', protect, getAllPolicies);
 
+// GET /api/policies/mine    — Only THIS proposer's policies (for Proposer dashboard)
+router.get('/mine', protect, getMyPolicies);
+
+// POST /api/policies/create — Create a new policy
+router.post('/create', protect, createPolicy);
 
 export default router;

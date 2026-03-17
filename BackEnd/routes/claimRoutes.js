@@ -1,56 +1,58 @@
-// // F:\Mehnat\BackEnd\routes\claimRoutes.js
-
-// import express from 'express';
-// import { protect } from '../middleware/authMiddleware.js'; 
-// import { getPendingClaims, submitClaim } from '../controllers/claimController.js'; 
-// import multer from 'multer';
-
-// const router = express.Router();
-
-// // Configure Multer for file storage
-// // We'll store files temporarily in a folder named 'uploads'
-// const upload = multer({ dest: 'uploads/' }); 
-
-// // @desc    Submit a new insurance claim (Protected route)
-// // @route   POST /api/claims/submit
-// // @access  Private (Requires Farmer role)
-// router.post(
-//     '/submit', 
-//     protect, // 1. Verify JWT token
-//     upload.single('claimImage'), // 2. Handle the file upload (field name must be 'claimImage')
-//     submitClaim // 3. Process the form and file data
-// );
-
-// router.get("/pending",protect,getPendingClaims)
-
-// export default router;
-
-
-
-// F:\Mehnat\BackEnd\routes\claimRoutes.js
+// BackEnd/routes/claimRoutes.js
 
 import express from 'express';
-import { protect } from '../middleware/authMiddleware.js'; 
-// Import updateClaimStatus
-import { getPendingClaims, submitClaim, updateClaimStatus } from '../controllers/claimController.js'; 
 import multer from 'multer';
+import path from 'path';
+import { protect } from '../middleware/authMiddleware.js';
+import {
+    submitClaim,
+    getPendingClaims,
+    getMyClaims,
+    updateClaimStatus,
+} from '../controllers/claimController.js';
 
 const router = express.Router();
 
-// Configure Multer for file storage
-const upload = multer({ dest: 'uploads/' }); 
+// ── MULTER FILE UPLOAD SETUP ───────────────────────────────────
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/');
+    },
+    filename: (req, file, cb) => {
+        const uniqueName = `claim_${Date.now()}_${Math.round(Math.random() * 1e9)}`;
+        cb(null, uniqueName);
+    },
+});
 
-// POST /submit (Farmer submits claim)
-router.post(
-    '/submit', 
-    protect, 
-    upload.single('claimImage'), 
-    submitClaim 
-);
+const fileFilter = (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp|heic/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (extname && mimetype) {
+        cb(null, true);
+    } else {
+        cb(new Error('Only image files are allowed (jpg, png, gif, webp)'));
+    }
+};
 
-router.get("/pending",protect,getPendingClaims)
+const upload = multer({
+    storage,
+    fileFilter,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+});
 
-// --- CRITICAL FIX: Add the PUT route for status update ---
-router.put('/status/:id', protect, updateClaimStatus);
+// ── ROUTES ─────────────────────────────────────────────────────
+
+// POST /api/claims/submit  — Farmer submits a claim with image
+router.post('/submit', protect, upload.single('claimImage'), submitClaim);
+
+// GET /api/claims/pending  — Proposer/Admin sees only their own policy claims
+router.get('/pending', protect, getPendingClaims);
+
+// GET /api/claims/myclaims — Farmer sees their own claims
+router.get('/myclaims', protect, getMyClaims);
+
+// PUT /api/claims/:id/status — Proposer/Admin approves or rejects
+router.put('/:id/status', protect, updateClaimStatus);
 
 export default router;
