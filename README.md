@@ -7,16 +7,22 @@ AgriSurance is a full-stack MERN web application that digitizes the crop insuran
 
 🔐 Role-Based Authentication
 Separate dashboards and access control for Farmers, Insurance Providers, and Admins.
+
 🌾 Policy Enrollment System
 Farmers can browse and enroll in crop insurance policies online.
+
 📸 Camera-Based Claim Submission
 Upload crop damage proof directly using device camera with AI-simulated land area detection.
+
 ⚡ Real-Time Claim Tracking
 Farmers can monitor claim approval and payout status step-by-step.
+
 💳 EMI Payment Integration
 Supports UPI, card, and net banking payment methods with flexible EMI plans.
+
 📂 Provider Claim Management
 Insurance providers can review, approve, or reject claims related to their policies only.
+
 📧 Email Notifications
 Automated email alerts for policy approvals, claim updates, and payment confirmations.
 
