@@ -1,6 +1,6 @@
 // BackEnd/controllers/enrollmentController.js
 import asyncHandler from 'express-async-handler';
-import Enrollment from '../models/enrollmentModel.js';
+import Enrollment from '../models/EnrollmentModel.js';
 import Policy from '../models/PolicyModel.js';
 
 // @route POST /api/enrollments/apply
@@ -80,3 +80,26 @@ const updateEnrollmentStatus = asyncHandler(async (req, res) => {
 });
 
 export { applyEnrollment, getMyEnrollments, getPendingEnrollments, updateEnrollmentStatus };
+
+// @route GET /api/enrollments/clients
+// @access Private (Proposer) — get ALL enrollments for their policies
+export const getMyClients = async (req, res) => {
+  try {
+    if (req.user.role !== 'Proposer' && req.user.role !== 'Admin') {
+      return res.status(403).json({ message: 'Not authorized.' });
+    }
+    const Policy = (await import('../models/PolicyModel.js')).default;
+    const myPolicies = await Policy.find({ proposer: req.user._id }).select('_id');
+    const policyIds = myPolicies.map(p => p._id);
+
+    const Enrollment = (await import('../models/EnrollmentModel.js')).default;
+    const clients = await Enrollment.find({ policy: { $in: policyIds } })
+      .populate('farmer', 'name email')
+      .populate('policy', 'name companyName coverageType coverageAmount')
+      .sort({ createdAt: -1 });
+
+    res.json(clients);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

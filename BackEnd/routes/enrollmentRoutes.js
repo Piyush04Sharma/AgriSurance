@@ -11,3 +11,5 @@ router.get('/pending',         protect, getPendingEnrollments);
 router.put('/:id/status',      protect, updateEnrollmentStatus);
 
 export default router;
+import { getMyClients } from '../controllers/enrollmentController.js';
+router.get('/clients', protect, getMyClients);

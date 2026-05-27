@@ -1,156 +1,66 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext.jsx';
-import ClaimSubmissionForm from '../components/ClaimSubmissionForm.jsx';
-import PolicyEnrollmentForm from '../components/PolicyEnrollmentForm.jsx';
+import { useNavigate } from 'react-router-dom';
 
-const COVERAGE_ICONS = { Drought: '☀️', Flood: '🌊', Pest: '🐛' };
-const COVERAGE_CLASSES = { Drought: 'coverage-drought', Flood: 'coverage-flood', Pest: 'coverage-pest' };
+const BASE_URL = 'http://localhost:5000';
 
-function PolicyCard({ policy, isFavorite, onToggleFavorite, expanded, onToggleExpand, onEnroll, delay }) {
-  return (
-    <div
-      className="policy-card"
-      style={{ animationDelay: `${delay}s` }}
-    >
-      <div className="policy-card-header">
-        <div>
-          <div className="policy-company">{policy.companyName || 'Insurance Co.'}</div>
-          <div className="policy-name">{policy.name}</div>
-        </div>
-        <button
-          className="policy-fav-btn"
-          onClick={(e) => { e.stopPropagation(); onToggleFavorite(policy._id); }}
-          title={isFavorite ? 'Remove from favourites' : 'Save to favourites'}
-        >
-          {isFavorite ? '❤️' : '🤍'}
-        </button>
-      </div>
-
-      <span className={`policy-coverage-badge ${COVERAGE_CLASSES[policy.coverageType] || ''}`}>
-        {COVERAGE_ICONS[policy.coverageType] || '🛡️'} {policy.coverageType}
-      </span>
-
-      <div className="policy-stats">
-        <div className="policy-stat-item">
-          <span className="policy-stat-value">₹{(policy.premiumPrice || 0).toLocaleString('en-IN')}</span>
-          <span className="policy-stat-label">Premium / Season</span>
-        </div>
-        <div className="policy-stat-item">
-          <span className="policy-stat-value">₹{(policy.coverageAmount || 0).toLocaleString('en-IN')}</span>
-          <span className="policy-stat-label">Max Payout</span>
-        </div>
-      </div>
-
-      {/* Expand Details */}
-      {expanded && (
-        <div className="policy-details">
-          <p>{policy.description || 'This policy provides comprehensive coverage for crop losses due to the specified natural disaster. Coverage includes assessment, documentation, and quick disbursement within 72 hours of approval.'}</p>
-          <div className="policy-details-id">Policy ID: {policy._id}</div>
-        </div>
-      )}
-
-      <div className="policy-card-footer">
-        <button
-          className="btn-secondary"
-          style={{ flex: 1, padding: '0.55rem', fontSize: '0.8rem' }}
-          onClick={(e) => { e.stopPropagation(); onToggleExpand(policy._id); }}
-        >
-          {expanded ? '▲ Less' : '▼ Details'}
-        </button>
-        <button
-          className="btn-primary"
-          style={{ flex: 1.5, padding: '0.55rem', fontSize: '0.82rem' }}
-          onClick={(e) => { e.stopPropagation(); onEnroll(policy); }}
-        >
-          Enroll Now →
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function FarmerDashboard() {
+export default function FarmerDashboard() {
   const { token, user } = useAuth();
-  const [availablePolicies, setAvailablePolicies] = useState([]);
-  const [myClaims, setMyClaims] = useState([]);
+  const navigate = useNavigate();
+  const [stats, setStats] = useState({ enrollments: 0, approved: 0, claims: 0, pending: 0 });
+  const [recentClaims, setRecentClaims] = useState([]);
+  const [recentEnrollments, setRecentEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [expandedPolicyId, setExpandedPolicyId] = useState(null);
-  const [favorites, setFavorites] = useState([]);
-  const [filterType, setFilterType] = useState('All');
-  const [claimForm, setClaimForm] = useState({ visible: false, selectedPolicy: null });
-  const [claimFileForm, setClaimFileForm] = useState({ visible: false, selectedPolicy: null });
-  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (!token) return;
     const config = { headers: { Authorization: `Bearer ${token}` } };
-    const load = async () => {
-      try {
-        const [polRes] = await Promise.all([
-          axios.get('http://localhost:5000/api/policies/active', config),
-        ]);
-        setAvailablePolicies(polRes.data);
-        // Try fetching claims
-        try {
-          const clRes = await axios.get('http://localhost:5000/api/claims/myclaims', config);
-          setMyClaims(clRes.data);
-        } catch { /* claims endpoint may not exist yet */ }
-      } catch {
-        // fallback: demo data
-        setAvailablePolicies([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    Promise.all([
+      axios.get(`${BASE_URL}/api/enrollments/mine`, config).catch(() => ({ data: [] })),
+      axios.get(`${BASE_URL}/api/claims/myclaims`, config).catch(() => ({ data: [] })),
+    ]).then(([enrRes, clmRes]) => {
+      const enrs = enrRes.data;
+      const clms = clmRes.data;
+      setStats({
+        enrollments: enrs.length,
+        approved: enrs.filter(e => e.status === 'Approved').length,
+        claims: clms.length,
+        pending: clms.filter(c => c.status === 'Pending').length,
+      });
+      setRecentEnrollments(enrs.slice(0, 3));
+      setRecentClaims(clms.slice(0, 3));
+    }).finally(() => setLoading(false));
   }, [token]);
-
-  const handleApply = (policy) => setClaimForm({ visible: true, selectedPolicy: policy });
-  const handleClose = () => setClaimForm({ visible: false, selectedPolicy: null });
-  const handleFileClaim = (policy) => setClaimFileForm({ visible: true, selectedPolicy: policy });
-  const handleCloseClaimFile = () => setClaimFileForm({ visible: false, selectedPolicy: null });
-
-  const approvedClaims = myClaims.filter(c => c.status === 'Approved');
-  const pendingClaims  = myClaims.filter(c => c.status === 'Pending');
-
-  const filteredPolicies = availablePolicies.filter(p => {
-    const matchesType = filterType === 'All' || p.coverageType === filterType;
-    const matchesSearch = !searchQuery ||
-      p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.companyName?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesType && matchesSearch;
-  });
 
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
+  const NAV_CARDS = [
+    { icon: '🏪', title: 'Policy Marketplace', desc: 'Browse, enroll and manage your insurance policies', path: '/my-policies', color: 'var(--green-mid)', badge: `${stats.approved} active` },
+    { icon: '🚨', title: 'File a Claim',        desc: 'Report crop damage on your approved enrollments',  path: '/file-claim',  color: '#c0392b',           badge: stats.approved > 0 ? `${stats.approved} eligible` : 'Enroll first' },
+    { icon: '📋', title: 'Claims History',      desc: 'Track all your submitted damage claims',           path: '/claims-history', color: '#2563eb',        badge: `${stats.claims} total` },
+  ];
+
   return (
     <div className="dashboard-wrapper">
-      {/* ── HEADER ── */}
+      {/* Header */}
       <div className="dashboard-header anim-fadeUp">
         <div>
-          <h1 className="dashboard-greeting">
-            Good day, <span>{user?.name?.split(' ')[0] || 'Farmer'}</span> 🌾
-          </h1>
+          <h1 className="dashboard-greeting">Good day, <span>{user?.name?.split(' ')[0] || 'Farmer'}</span> 🌾</h1>
           <p className="dashboard-date">{today}</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span className="badge badge-approved" style={{ fontSize: '0.78rem', padding: '5px 12px' }}>
-            ✓ Verified Farmer
-          </span>
-        </div>
+        <span className="badge badge-approved" style={{ fontSize: '0.78rem', padding: '5px 12px' }}>✓ Verified Farmer</span>
       </div>
 
-      {/* ── STATS ── */}
+      {/* Stats */}
       <div className="stats-grid">
         {[
-          { icon: '📋', value: myClaims.length || 0, label: 'Total Claims', color: 'blue', delta: null },
-          { icon: '✅', value: approvedClaims.length || 0, label: 'Approved Claims', color: 'green', delta: '+2 this month' },
-          { icon: '⏳', value: pendingClaims.length || 0, label: 'Pending Review', color: 'gold', delta: null },
-          { icon: '🛡️', value: availablePolicies.length || 0, label: 'Active Policies', color: 'green', delta: 'Available' },
+          { icon: '🛡️', value: stats.enrollments, label: 'My Enrollments',  color: 'green' },
+          { icon: '✅', value: stats.approved,     label: 'Active Policies', color: 'green' },
+          { icon: '📋', value: stats.claims,       label: 'Total Claims',    color: 'blue'  },
+          { icon: '⏳', value: stats.pending,      label: 'Pending Review',  color: 'gold'  },
         ].map((s, i) => (
           <div key={i} className={`stat-card ${s.color}`} style={{ animationDelay: `${i * 0.1}s` }}>
-            {s.delta && <span className="stat-delta up">{s.delta}</span>}
             <span className="stat-icon">{s.icon}</span>
             <div className="stat-value">{s.value}</div>
             <div className="stat-label">{s.label}</div>
@@ -158,185 +68,79 @@ function FarmerDashboard() {
         ))}
       </div>
 
-      {/* ── NOTIFICATIONS ── */}
-      {myClaims.length > 0 && (
-        <div className="card anim-fadeUp delay-4" style={{ marginBottom: '2rem' }}>
-          <div className="card-header">
-            <span className="card-title">🔔 Claim Updates</span>
-            <span className="badge badge-pending">{myClaims.length} claims</span>
-          </div>
-          <div className="card-body">
-            <div className="notification-list">
-              {myClaims.slice(0, 4).map((claim, i) => (
-                <div key={claim._id || i} className="notification-item" style={{ animationDelay: `${i * 0.1}s` }}>
-                  <span className="notif-icon">
-                    {claim.status === 'Approved' ? '✅' : claim.status === 'Rejected' ? '❌' : '⏳'}
-                  </span>
-                  <div>
-                    <div className="notif-title">
-                      Claim for {claim.cropType || 'Crop'} — {claim.status}
-                    </div>
-                    <div className="notif-time">
-                      {claim.status === 'Approved'
-                        ? `₹${claim.estimatedLossValue?.toLocaleString('en-IN')} approved for payout`
-                        : `Submitted ${new Date(claim.createdAt).toLocaleDateString('en-IN')}`}
-                    </div>
-                  </div>
-                  <span className={`badge badge-${claim.status?.toLowerCase()}`} style={{ marginLeft: 'auto', flexShrink: 0 }}>
-                    {claim.status}
-                  </span>
-                </div>
-              ))}
+      {/* Navigation Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', margin: '2rem 0' }}>
+        {NAV_CARDS.map((card, i) => (
+          <div key={i} onClick={() => navigate(card.path)}
+            className="anim-fadeUp"
+            style={{ background: 'rgba(28,23,16,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 'var(--radius-lg)', padding: '1.75rem', cursor: 'pointer', transition: 'all 0.3s ease', animationDelay: `${i * 0.1}s`, position: 'relative', overflow: 'hidden' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.borderColor = 'rgba(201,153,58,0.3)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.boxShadow = 'none'; }}>
+            {/* Color accent bar */}
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: card.color, borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0' }} />
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div style={{ width: '52px', height: '52px', borderRadius: 'var(--radius-md)', background: `${card.color}20`, border: `1px solid ${card.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem' }}>
+                {card.icon}
+              </div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '3px 10px', borderRadius: '50px', background: 'rgba(201,153,58,0.1)', color: 'var(--gold-light)', border: '1px solid rgba(201,153,58,0.2)' }}>
+                {card.badge}
+              </span>
+            </div>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: 'var(--white)', marginBottom: '0.5rem' }}>{card.title}</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--earth-400)', lineHeight: 1.6, margin: 0 }}>{card.desc}</p>
+            <div style={{ marginTop: '1.25rem', fontSize: '0.82rem', color: 'var(--gold)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              Open → 
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ── POLICY MARKETPLACE ── */}
-      <div className="card anim-fadeUp delay-5">
-        <div className="card-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
-          <span className="card-title">🏪 Policy Marketplace</span>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* Search */}
-            <div style={{ position: 'relative' }}>
-              <input
-                type="text"
-                placeholder="Search policies..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="form-input"
-                style={{ paddingLeft: '2rem', width: '180px', height: '34px', fontSize: '0.8rem' }}
-              />
-              <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.85rem', opacity: 0.5 }}>🔍</span>
-            </div>
-            {/* Filter */}
-            {['All', 'Drought', 'Flood', 'Pest'].map(f => (
-              <button
-                key={f}
-                onClick={() => setFilterType(f)}
-                style={{
-                  padding: '0.35rem 0.85rem',
-                  borderRadius: '50px',
-                  border: `1px solid ${filterType === f ? 'var(--gold)' : 'rgba(255,255,255,0.1)'}`,
-                  background: filterType === f ? 'rgba(201,153,58,0.15)' : 'transparent',
-                  color: filterType === f ? 'var(--gold-light)' : 'var(--earth-400)',
-                  font: 'inherit', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                }}>
-                {f === 'All' ? '🛡️ All' : `${COVERAGE_ICONS[f] || ''} ${f}`}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ padding: '1.5rem' }}>
-          {loading ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-              {[1,2,3].map(i => (
-                <div key={i} style={{ height: '280px', borderRadius: 'var(--radius-lg)' }} className="skeleton" />
-              ))}
-            </div>
-          ) : filteredPolicies.length === 0 ? (
-            <div className="claims-empty">
-              <span className="claims-empty-icon">🌾</span>
-              <p>
-                {availablePolicies.length === 0
-                  ? 'No active policies available from providers yet. Check back soon!'
-                  : 'No policies match your search. Try different filters.'}
-              </p>
-            </div>
-          ) : (
-            <div className="policy-grid">
-              {filteredPolicies.map((policy, i) => (
-                <PolicyCard
-                  key={policy._id}
-                  policy={policy}
-                  isFavorite={favorites.includes(policy._id)}
-                  onToggleFavorite={id => setFavorites(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
-                  expanded={expandedPolicyId === policy._id}
-                  onToggleExpand={id => setExpandedPolicyId(id === expandedPolicyId ? null : id)}
-                  onEnroll={handleApply}
-                  delay={i * 0.08}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+        ))}
       </div>
 
-      {/* ── MY ACTIVE CLAIMS (Enrolled Policy Claims) ── */}
-      {myClaims.length > 0 && (
-        <div className="card anim-fadeUp" style={{ marginTop: '1.5rem' }}>
+      {/* Recent Activity */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+        {/* Recent Enrollments */}
+        <div className="card anim-fadeUp delay-4">
           <div className="card-header">
-            <span className="card-title">📋 My Claims — File &amp; Track</span>
-            <span className="badge badge-pending">{myClaims.length} total</span>
+            <span className="card-title">🛡️ Recent Enrollments</span>
+            <button onClick={() => navigate('/my-policies')} style={{ fontSize: '0.75rem', color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>View All →</button>
           </div>
-          <div style={{ padding: '1rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {myClaims.map((claim, i) => (
-              <div key={claim._id || i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1rem', background: 'rgba(14,11,7,0.4)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', gap: '1rem', flexWrap: 'wrap', animation: `slideRight 0.4s ease ${i*0.08}s both` }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--earth-100)', marginBottom: '3px' }}>
-                    {claim.cropType || 'Crop'} — {claim.policy?.name || 'Policy'}
-                  </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--earth-500)' }}>
-                    Est. Loss: ₹{Number(claim.estimatedLossValue || 0).toLocaleString('en-IN')} · {new Date(claim.createdAt).toLocaleDateString('en-IN')}
-                  </div>
+          <div className="card-body" style={{ padding: '0.75rem 1rem' }}>
+            {loading ? <div style={{ height: '80px' }} className="skeleton" /> :
+             recentEnrollments.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--earth-500)', fontSize: '0.85rem' }}>No enrollments yet</div>
+            ) : recentEnrollments.map((enr, i) => (
+              <div key={enr._id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0', borderBottom: i < recentEnrollments.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--earth-100)' }}>{enr.policy?.name || 'Policy'}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--earth-500)' }}>{enr.policy?.companyName}</div>
                 </div>
-                <span className={`badge badge-${claim.status?.toLowerCase() || 'pending'}`}>{claim.status || 'Pending'}</span>
+                <span className={`badge badge-${enr.status?.toLowerCase() === 'approved' ? 'approved' : enr.status?.toLowerCase() === 'rejected' ? 'rejected' : 'pending'}`} style={{ fontSize: '0.65rem' }}>{enr.status}</span>
               </div>
             ))}
           </div>
         </div>
-      )}
 
-      {/* ── FILE NEW CLAIM section ── */}
-      {availablePolicies.length > 0 && (
-        <div className="card anim-fadeUp" style={{ marginTop: '1.5rem' }}>
+        {/* Recent Claims */}
+        <div className="card anim-fadeUp delay-5">
           <div className="card-header">
-            <span className="card-title">🚨 File a Damage Claim</span>
+            <span className="card-title">📋 Recent Claims</span>
+            <button onClick={() => navigate('/claims-history')} style={{ fontSize: '0.75rem', color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>View All →</button>
           </div>
-          <div style={{ padding: '1rem 1.5rem' }}>
-            <p style={{ fontSize: '0.85rem', color: 'var(--earth-400)', marginBottom: '1rem', lineHeight: 1.6 }}>
-              Already enrolled in a policy and suffered crop damage? Select the policy and file a claim.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              {availablePolicies.map((policy, i) => (
-                <div key={policy._id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'rgba(14,11,7,0.4)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', gap: '1rem' }}>
-                  <div>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--earth-100)' }}>{policy.name}</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--earth-400)' }}>{policy.companyName} · {policy.coverageType}</div>
-                  </div>
-                  <button
-                    onClick={() => handleFileClaim(policy)}
-                    style={{ padding: '0.45rem 1rem', background: 'rgba(231,76,60,0.12)', color: '#e74c3c', border: '1px solid rgba(231,76,60,0.25)', borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
-                    🚨 File Claim
-                  </button>
+          <div className="card-body" style={{ padding: '0.75rem 1rem' }}>
+            {loading ? <div style={{ height: '80px' }} className="skeleton" /> :
+             recentClaims.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--earth-500)', fontSize: '0.85rem' }}>No claims yet</div>
+            ) : recentClaims.map((claim, i) => (
+              <div key={claim._id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0', borderBottom: i < recentClaims.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--earth-100)' }}>{claim.cropType || 'Crop'} — {claim.policy?.name || ''}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--earth-500)' }}>₹{Number(claim.estimatedLossValue || 0).toLocaleString('en-IN')} · {new Date(claim.createdAt).toLocaleDateString('en-IN')}</div>
                 </div>
-              ))}
-            </div>
+                <span className={`badge badge-${claim.status?.toLowerCase() === 'approved' ? 'approved' : claim.status?.toLowerCase() === 'rejected' ? 'rejected' : 'pending'}`} style={{ fontSize: '0.65rem' }}>{claim.status}</span>
+              </div>
+            ))}
           </div>
         </div>
-      )}
-
-      {/* ── ENROLLMENT MODAL ── */}
-      {claimForm.visible && claimForm.selectedPolicy && (
-        <PolicyEnrollmentForm
-          policy={claimForm.selectedPolicy}
-          token={token}
-          onClose={handleClose}
-        />
-      )}
-
-      {/* ── CLAIM FILING MODAL ── */}
-      {claimFileForm.visible && claimFileForm.selectedPolicy && (
-        <ClaimSubmissionForm
-          policy={claimFileForm.selectedPolicy}
-          token={token}
-          onClose={handleCloseClaimFile}
-        />
-      )}
+      </div>
     </div>
   );
 }
-
-export default FarmerDashboard;
